@@ -1,0 +1,157 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 246 78% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 94%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 94%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --border: 214 32% 88%;
+    --input: 214 32% 88%;
+    --ring: 246 78% 60%;
+    --chart-1: 246 78% 60%;
+    --chart-2: 280 70% 60%;
+    --chart-3: 190 90% 50%;
+    --chart-4: 142 71% 45%;
+    --chart-5: 38 92% 50%;
+    --radius: 1rem;
+  }
+
+  .dark {
+    /* Premium dark */
+    --background: 230 25% 7%;
+    --foreground: 210 40% 98%;
+    --card: 230 22% 11%;
+    --card-foreground: 210 40% 98%;
+    --popover: 230 22% 11%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 246 78% 64%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 230 18% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 230 18% 18%;
+    --muted-foreground: 217 14% 60%;
+    --accent: 230 18% 18%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --border: 230 18% 20%;
+    --input: 230 18% 20%;
+    --ring: 246 78% 64%;
+    --chart-1: 246 78% 64%;
+    --chart-2: 280 70% 64%;
+    --chart-3: 190 90% 54%;
+    --chart-4: 142 71% 45%;
+    --chart-5: 38 92% 54%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings:
+      'rlig' 1,
+      'calt' 1;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-white/10 bg-white/5 backdrop-blur-xl;
+  }
+  .glass-dark {
+    @apply border border-white/10 bg-[hsl(230_22%_11%_/0.7)] backdrop-blur-xl;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent;
+  }
+  .gradient-border {
+    position: relative;
+    background:
+      linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box,
+      linear-gradient(135deg, hsl(246 78% 64% / 0.5), hsl(280 70% 64% / 0.5))
+        border-box;
+    border: 1px solid transparent;
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+  .glow {
+    box-shadow:
+      0 0 0 1px hsl(var(--border)),
+      0 8px 40px -8px hsl(246 78% 64% / 0.35);
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 9999px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+  .animate-fade-in {
+    animation: fade-in 0.5s ease-out;
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--accent)) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+}
