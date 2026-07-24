@@ -15,28 +15,28 @@ const groups = [
   {
     title: 'Company',
     links: [
-      { title: 'About', href: '#' },
-      { title: 'Blog', href: '#' },
-      { title: 'Careers', href: '#' },
-      { title: 'Contact', href: '#' },
+      { title: 'About', href: '/about' },
+      { title: 'Blog', href: '/blog' },
+      { title: 'Careers', href: '/careers' },
+      { title: 'Contact', href: '/contact' },
     ],
   },
   {
     title: 'Resources',
     links: [
-      { title: 'Documentation', href: '#' },
-      { title: 'API Reference', href: '#' },
-      { title: 'Community', href: '#' },
-      { title: 'Status', href: '#' },
+      { title: 'Documentation', href: '/docs' },
+      { title: 'API Reference', href: '/api-reference' },
+      { title: 'Community', href: '/community' },
+      { title: 'Status', href: '/status' },
     ],
   },
   {
     title: 'Legal',
     links: [
-      { title: 'Privacy', href: '#' },
-      { title: 'Terms', href: '#' },
-      { title: 'Security', href: '#' },
-      { title: 'Cookies', href: '#' },
+      { title: 'Privacy', href: '/privacy' },
+      { title: 'Terms', href: '/terms' },
+      { title: 'Security', href: '/security' },
+      { title: 'Cookies', href: '/cookies' },
     ],
   },
 ];
@@ -54,21 +54,27 @@ export function Footer() {
             </p>
             <div className="mt-6 flex items-center gap-3">
               <Link
-                href="#"
+                href="https://github.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="GitHub"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Github className="h-4 w-4" />
               </Link>
               <Link
-                href="#"
+                href="https://x.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="Twitter"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground"
               >
                 <Twitter className="h-4 w-4" />
               </Link>
               <Link
-                href="#"
+                href="https://linkedin.com"
+                target="_blank"
+                rel="noopener noreferrer"
                 aria-label="LinkedIn"
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground"
               >

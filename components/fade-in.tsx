@@ -11,7 +11,14 @@ type Props = {
 };
 
 export function FadeIn({ delay = 0, y = 16, className, children }: Props) {
-  const reduce = useReducedMotion();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const shouldReduce = useReducedMotion();
+  const reduce = mounted && shouldReduce;
+
   if (reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div

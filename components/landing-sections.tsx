@@ -140,6 +140,7 @@ const pricingPlans = [
       'Community support',
     ],
     cta: 'Start free',
+    href: '/signup',
     highlighted: false,
   },
   {
@@ -155,6 +156,7 @@ const pricingPlans = [
       'Priority support',
     ],
     cta: 'Start 14-day trial',
+    href: '/signup',
     highlighted: true,
   },
   {
@@ -170,6 +172,7 @@ const pricingPlans = [
       'Dedicated support',
     ],
     cta: 'Contact sales',
+    href: '/contact',
     highlighted: false,
   },
 ];
@@ -545,7 +548,7 @@ export function LandingPricing() {
                     )}
                     variant={p.highlighted ? 'default' : 'outline'}
                   >
-                    <Link href="/signup">{p.cta}</Link>
+                    <Link href={p.href}>{p.cta}</Link>
                   </Button>
                   <ul className="mt-6 space-y-3">
                     {p.features.map((feat) => (
