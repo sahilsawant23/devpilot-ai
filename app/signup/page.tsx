@@ -114,11 +114,11 @@ export default function SignUpPage() {
             />
             <span>
               I agree to the{' '}
-              <Link href="#" className="text-primary hover:underline">
+              <Link href="/terms" className="text-primary hover:underline">
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="#" className="text-primary hover:underline">
+              <Link href="/privacy" className="text-primary hover:underline">
                 Privacy Policy
               </Link>
             </span>
