@@ -1,5 +1,14 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# environment variables (never commit secrets)
+.env
+.env.local
+.env.production
+
+# local SQLite database
+prisma/dev.db
+prisma/dev.db-journal
+
 # dependencies
 /node_modules
 /.pnp
