@@ -28,15 +28,32 @@ export default function LoginPage() {
     return Object.keys(e).length === 0;
   }
 
-  function onSubmit(ev: React.FormEvent) {
+  async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setErrors({});
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Invalid credentials');
+        setLoading(false);
+        return;
+      }
+
       toast.success('Welcome back!');
       router.push('/dashboard');
-    }, 900);
+    } catch (err) {
+      toast.error('An error occurred. Please try again.');
+      setLoading(false);
+    }
   }
 
   return (

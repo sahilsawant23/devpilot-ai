@@ -37,15 +37,48 @@ export default function SignUpPage() {
     return Object.keys(e).length === 0;
   }
 
-  function onSubmit(ev: React.FormEvent) {
+  async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    setTimeout(() => {
+    setErrors({});
+
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        if (res.status === 409) {
+          setErrors({ email: data.error || 'Email already registered' });
+        } else {
+          toast.error(data.error || 'Registration failed');
+        }
+        setLoading(false);
+        return;
+      }
+
+      // Automatically log the user in
+      const loginRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (loginRes.ok) {
+        toast.success('Account created! Welcome to DevPilot AI.');
+        router.push('/dashboard');
+      } else {
+        toast.success('Account created successfully! Please sign in.');
+        router.push('/login');
+      }
+    } catch (err) {
+      toast.error('An error occurred. Please try again.');
       setLoading(false);
-      toast.success('Account created! Welcome to DevPilot AI.');
-      router.push('/dashboard');
-    }, 1100);
+    }
   }
 
   return (

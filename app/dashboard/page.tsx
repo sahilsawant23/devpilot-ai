@@ -62,11 +62,30 @@ function ChartCard({
 }
 
 export default function DashboardPage() {
+  const [userName, setUserName] = React.useState('Alex');
+
+  React.useEffect(() => {
+    async function fetchUser() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user && data.user.name) {
+            setUserName(data.user.name);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch user:', err);
+      }
+    }
+    fetchUser();
+  }, []);
+
   return (
     <AppShell>
       <PageHeader
         title="Dashboard"
-        description="Welcome back, Alex. Here's what's happening across your workspace."
+        description={`Welcome back, ${userName}. Here's what's happening across your workspace.`}
         actions={
           <>
             <Button asChild variant="outline" size="sm">
