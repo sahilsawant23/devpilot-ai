@@ -70,7 +70,7 @@ export default function SignUpPage() {
 
       if (loginRes.ok) {
         toast.success('Account created! Welcome to DevPilot AI.');
-        router.push('/dashboard');
+        router.push('/onboarding');
       } else {
         toast.success('Account created successfully! Please sign in.');
         router.push('/login');
