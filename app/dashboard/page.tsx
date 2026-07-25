@@ -22,9 +22,10 @@ import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/page-header';
 import { StatCard } from '@/components/stat-card';
 import { AppShell } from '@/components/app-shell';
-import { dashboardStats, weeklyActivity, languageDistribution, aiUsage, recentActivity } from '@/lib/data';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { dashboardStats, weeklyActivity, languageDistribution, aiUsage } from '@/lib/data';
+import { ArrowRight, Sparkles, Download, Activity, MessageSquare, Bug, BookOpen, FileText } from 'lucide-react';
 import Link from 'next/link';
+import { formatDistanceToNow } from 'date-fns';
 
 const tooltipStyle = {
   backgroundColor: 'hsl(var(--popover))',
@@ -61,8 +62,30 @@ function ChartCard({
   );
 }
 
+type DbActivity = {
+  id: string;
+  type: string;
+  title: string;
+  createdAt: string;
+  repository?: { name: string } | null;
+};
+
+const ACTIVITY_ICONS: Record<string, React.ElementType> = {
+  Chat: MessageSquare,
+  Review: Bug,
+  Docs: BookOpen,
+  Tests: FileText,
+  Analysis: Activity,
+};
+
+function exportToPDF() {
+  window.print();
+}
+
 export default function DashboardPage() {
   const [userName, setUserName] = React.useState('Alex');
+  const [activities, setActivities] = React.useState<DbActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = React.useState(true);
 
   React.useEffect(() => {
     async function fetchUser() {
@@ -70,15 +93,29 @@ export default function DashboardPage() {
         const res = await fetch('/api/auth/me');
         if (res.ok) {
           const data = await res.json();
-          if (data.user && data.user.name) {
-            setUserName(data.user.name);
-          }
+          if (data.user && data.user.name) setUserName(data.user.name);
         }
       } catch (err) {
         console.error('Failed to fetch user:', err);
       }
     }
+
+    async function fetchActivities() {
+      try {
+        const res = await fetch('/api/activity');
+        if (res.ok) {
+          const data = await res.json();
+          setActivities(data.activities ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch activities:', err);
+      } finally {
+        setActivitiesLoading(false);
+      }
+    }
+
     fetchUser();
+    fetchActivities();
   }, []);
 
   return (
@@ -88,6 +125,10 @@ export default function DashboardPage() {
         description={`Welcome back, ${userName}. Here's what's happening across your workspace.`}
         actions={
           <>
+            <Button variant="outline" size="sm" onClick={exportToPDF} id="export-pdf-btn">
+              <Download className="mr-2 h-4 w-4" />
+              Export PDF
+            </Button>
             <Button asChild variant="outline" size="sm">
               <Link href="/dashboard/chat">
                 <Sparkles className="mr-2 h-4 w-4" />
@@ -216,8 +257,8 @@ export default function DashboardPage() {
         </ChartCard>
       </div>
 
-      {/* Recent activity */}
-      <Card className="mt-4 border-border/60 bg-card/50">
+      {/* Recent activity — live from DB */}
+      <Card className="mt-4 border-border/60 bg-card/50" id="recent-activity-section">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <div>
             <CardTitle className="text-base">Recent Activity</CardTitle>
@@ -228,21 +269,42 @@ export default function DashboardPage() {
           </Button>
         </CardHeader>
         <CardContent className="px-0">
-          <div className="divide-y divide-border/60">
-            {recentActivity.map((a) => (
-              <div key={a.id} className="flex items-center gap-4 px-6 py-3.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                  <a.icon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{a.title}</p>
-                  <p className="text-xs text-muted-foreground">{a.repo}</p>
-                </div>
-                <Badge variant="secondary" className="hidden sm:inline-flex">{a.type}</Badge>
-                <span className="shrink-0 text-xs text-muted-foreground">{a.time}</span>
+          {activitiesLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          ) : activities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+                <Activity className="h-5 w-5 text-muted-foreground" />
               </div>
-            ))}
-          </div>
+              <p className="text-sm font-medium">No activity yet</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Start a chat or run a code review to see activity here.
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/60">
+              {activities.map((a) => {
+                const Icon = ACTIVITY_ICONS[a.type] ?? Activity;
+                return (
+                  <div key={a.id} className="flex items-center gap-4 px-6 py-3.5">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{a.title}</p>
+                      <p className="text-xs text-muted-foreground">{a.repository?.name ?? 'General'}</p>
+                    </div>
+                    <Badge variant="secondary" className="hidden sm:inline-flex">{a.type}</Badge>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatDistanceToNow(new Date(a.createdAt), { addSuffix: true })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </AppShell>
