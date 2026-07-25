@@ -155,3 +155,53 @@
     }
   }
 }
+
+/* ========== PDF / Print Styles ========== */
+@media print {
+  /* Hide UI chrome */
+  aside,
+  nav,
+  header,
+  #export-pdf-btn,
+  button,
+  [data-sidebar],
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for readability */
+  body,
+  html {
+    background: #ffffff !important;
+    color: #0f0f0f !important;
+  }
+
+  /* Make content fill the page */
+  main,
+  [data-main-content] {
+    margin: 0 !important;
+    padding: 16px !important;
+    width: 100% !important;
+  }
+
+  /* Cards look clean on paper */
+  .rounded-xl,
+  .rounded-2xl,
+  [class*="border-border"] {
+    border: 1px solid #d1d5db !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+  }
+
+  /* Force black text */
+  * {
+    color: #0f0f0f !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page breaks */
+  #recent-activity-section {
+    page-break-before: auto;
+  }
+}
