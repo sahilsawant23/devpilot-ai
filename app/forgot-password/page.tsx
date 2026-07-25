@@ -15,17 +15,33 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = React.useState(false);
   const [sent, setSent] = React.useState(false);
 
-  function onSubmit(ev: React.FormEvent) {
+  async function onSubmit(ev: React.FormEvent) {
     ev.preventDefault();
     if (!email) return setError('Email is required');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setError('Enter a valid email');
     setError(undefined);
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        setLoading(false);
+        return;
+      }
+
       setSent(true);
-      toast.success('Reset link sent to your email');
-    }, 900);
+      toast.success('Reset link sent!');
+    } catch {
+      setError('Network error. Please try again.');
+      setLoading(false);
+    }
   }
 
   if (sent) {
