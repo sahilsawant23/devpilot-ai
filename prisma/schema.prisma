@@ -8,9 +8,94 @@ generator client {
 }
 
 model User {
+  id                 String               @id @default(uuid())
+  name               String
+  email              String               @unique
+  password           String
+  onboardingComplete Boolean              @default(false)
+  createdAt          DateTime             @default(now())
+  repositories       Repository[]
+  chatSessions       ChatSession[]
+  reports            Report[]
+  notifications      Notification[]
+  apiKeys            ApiKey[]
+  activities         Activity[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model Repository {
+  id          String     @id @default(uuid())
+  name        String
+  description String?
+  language    String?
+  url         String?
+  health      Int        @default(0)
+  status      String     @default("Pending")
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  activities  Activity[]
+  reports     Report[]
+}
+
+model ChatSession {
   id        String   @id @default(uuid())
+  title     String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Report {
+  id           String      @id @default(uuid())
+  title        String
+  type         String
+  content      String
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  repositoryId String?
+  repository   Repository? @relation(fields: [repositoryId], references: [id])
+  createdAt    DateTime    @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  title     String
+  read      Boolean  @default(false)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+model ApiKey {
+  id        String    @id @default(uuid())
   name      String
-  email     String   @unique
-  password  String
+  key       String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  lastUsed  DateTime?
+}
+
+model Activity {
+  id           String      @id @default(uuid())
+  type         String
+  title        String
+  userId       String
+  user         User        @relation(fields: [userId], references: [id])
+  repositoryId String?
+  repository   Repository? @relation(fields: [repositoryId], references: [id])
+  createdAt    DateTime    @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  used      Boolean  @default(false)
   createdAt DateTime @default(now())
 }
