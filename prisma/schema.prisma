@@ -8,18 +8,19 @@ generator client {
 }
 
 model User {
-  id                 String               @id @default(uuid())
-  name               String
-  email              String               @unique
-  password           String
+  id                  String               @id @default(uuid())
+  name                String
+  email               String               @unique
+  password            String
+  role                String               @default("DEVELOPER") // 'ADMIN', 'DEVELOPER', 'VIEWER'
   onboardingComplete Boolean              @default(false)
-  createdAt          DateTime             @default(now())
-  repositories       Repository[]
-  chatSessions       ChatSession[]
-  reports            Report[]
-  notifications      Notification[]
-  apiKeys            ApiKey[]
-  activities         Activity[]
+  createdAt           DateTime             @default(now())
+  repositories        Repository[]
+  chatSessions        ChatSession[]
+  reports             Report[]
+  notifications       Notification[]
+  apiKeys             ApiKey[]
+  activities          Activity[]
   passwordResetTokens PasswordResetToken[]
 }
 
@@ -37,15 +38,41 @@ model Repository {
   updatedAt   DateTime   @updatedAt
   activities  Activity[]
   reports     Report[]
+  issues      Issue[]
 }
 
 model ChatSession {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   title     String
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  user      User      @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  role      String      // 'user' or 'assistant'
+  content   String
+  sessionId String
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  createdAt DateTime    @default(now())
+}
+
+model Issue {
+  id           String     @id @default(uuid())
+  severity     String     // Critical, High, Medium, Low
+  title        String
+  description  String
+  file         String
+  line         Int        @default(1)
+  fixCode      String?
+  category     String     @default("Security")
+  resolved     Boolean    @default(false)
+  repositoryId String
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
 }
 
 model Report {
