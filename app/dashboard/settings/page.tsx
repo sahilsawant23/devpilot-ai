@@ -71,9 +71,45 @@ export default function SettingsPage() {
     weekly: true,
     security: true,
   });
-  const [showKey, setShowKey] = React.useState(false);
   const [connecting, setConnecting] = React.useState(false);
-  const apiKey = 'sk-dp-a1b2c3d4e5f6g7h8i9j0k1l2m3n4';
+  const [apiKeysList, setApiKeysList] = React.useState<Array<{ id: string; name: string; key: string; createdAt?: string }>>([]);
+  const [visibleKeyIds, setVisibleKeyIds] = React.useState<Record<string, boolean>>({});
+
+  const fetchApiKeys = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/apikeys');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.keys) {
+          setApiKeysList(data.keys);
+        }
+      }
+    } catch {
+      // Keep silent or default
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchApiKeys();
+  }, [fetchApiKeys]);
+
+  const toggleKeyVisibility = (id: string) => {
+    setVisibleKeyIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const revokeKey = async (id: string) => {
+    try {
+      const res = await fetch(`/api/apikeys?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('API key revoked');
+        fetchApiKeys();
+      } else {
+        toast.error('Failed to revoke API key');
+      }
+    } catch {
+      toast.error('Network error revoking key');
+    }
+  };
 
   const themes = [
     { id: 'light', label: 'Light', icon: Sun },
@@ -250,53 +286,93 @@ export default function SettingsPage() {
           {/* API */}
           <TabsContent value="api" className="mt-0">
             <Card className="border-border/60 bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-base">API Settings</CardTitle>
-                <CardDescription>Use the DevPilot API to integrate with your tools</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">API Keys & Tokens</CardTitle>
+                  <CardDescription>Use DevPilot API keys to integrate with your CLI, GitHub Actions, and custom pipelines.</CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/apikeys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: `CLI Key ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` }),
+                      });
+                      const data = await res.json();
+                      if (data.key) {
+                        toast.success('New API Key generated!');
+                        fetchApiKeys();
+                      } else {
+                        toast.error(data.error || 'Failed to create key');
+                      }
+                    } catch (e) {
+                      toast.error('Network error creating API key');
+                    }
+                  }}
+                >
+                  <Key className="mr-2 h-4 w-4" />
+                  Generate New Key
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <Label className="mb-2 block">API Key</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        readOnly
-                        value={showKey ? apiKey : '•'.repeat(apiKey.length)}
-                        className="pr-10 font-mono"
-                      />
-                      <button
-                        onClick={() => setShowKey((s) => !s)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showKey ? 'Hide key' : 'Show key'}
-                      >
-                        {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
+                <div className="space-y-3">
+                  {apiKeysList.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                      No active API keys found. Click &quot;Generate New Key&quot; above to create your first API key.
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        navigator.clipboard.writeText(apiKey);
-                        toast.success('API key copied');
-                      }}
-                    >
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy
-                    </Button>
-                  </div>
+                  ) : (
+                    apiKeysList.map((k) => (
+                      <div key={k.id} className="flex flex-col gap-2 rounded-xl border border-border/60 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-medium">{k.name}</p>
+                          <p className="font-mono text-xs text-muted-foreground">
+                            {visibleKeyIds[k.id] ? k.key : `${k.key.slice(0, 10)}${'•'.repeat(20)}`}
+                          </p>
+                          {k.createdAt && (
+                            <p className="mt-1 text-[10px] text-muted-foreground">Created: {new Date(k.createdAt).toLocaleDateString()}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleKeyVisibility(k.id)}
+                            className="rounded-lg border p-2 text-muted-foreground hover:text-foreground"
+                            aria-label="Toggle visibility"
+                          >
+                            {visibleKeyIds[k.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              navigator.clipboard.writeText(k.key);
+                              toast.success('API key copied to clipboard');
+                            }}
+                          >
+                            <Copy className="mr-2 h-3.5 w-3.5" /> Copy
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => revokeKey(k.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 <Row title="Rate limit" description="Requests per minute on your plan">
                   <span className="text-sm font-medium">600 / min</span>
                 </Row>
-                <Row title="Webhook URL" description="Receive event callbacks">
+                <Row title="Webhook URL" description="Receive event callbacks for build & review triggers">
                   <Input placeholder="https://your-app.com/webhook" className="sm:w-72" />
                 </Row>
-                <Button
-                  className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:opacity-90"
-                  onClick={() => toast.success('Settings saved')}
-                >
-                  Save changes
-                </Button>
               </CardContent>
             </Card>
           </TabsContent>
