@@ -86,6 +86,7 @@ export default function DashboardPage() {
   const [userName, setUserName] = React.useState('Alex');
   const [activities, setActivities] = React.useState<DbActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = React.useState(true);
+  const [stats, setStats] = React.useState(dashboardStats);
 
   React.useEffect(() => {
     async function fetchUser() {
@@ -114,8 +115,30 @@ export default function DashboardPage() {
       }
     }
 
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/dashboard/stats');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.stats) {
+            setStats(prev => prev.map(s => {
+              if (s.label === 'Total Repositories') return { ...s, value: String(data.stats.repositories) };
+              if (s.label === 'AI Chats') return { ...s, value: String(data.stats.chats) };
+              if (s.label === 'Reports Generated') return { ...s, value: String(data.stats.reports) };
+              if (s.label === 'Bugs Detected') return { ...s, value: String(data.stats.bugs) };
+              if (s.label === 'Docs Created') return { ...s, value: String(data.stats.docs) };
+              return s;
+            }));
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch stats:', err);
+      }
+    }
+
     fetchUser();
     fetchActivities();
+    fetchStats();
   }, []);
 
   return (
@@ -144,7 +167,7 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {dashboardStats.map((s, i) => (
+        {stats.map((s, i) => (
           <StatCard key={s.label} stat={s} index={i} />
         ))}
       </div>

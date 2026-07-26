@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import {
   Star,
   GitBranch,
@@ -30,6 +31,39 @@ const stats = [
 ];
 
 export default function ProfilePage() {
+  const [user, setUser] = React.useState<{ name: string; email: string } | null>(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    async function fetchMe() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUser(data.user);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch user profiles:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchMe();
+  }, []);
+
+  const name = user?.name ?? 'Guest User';
+  const email = user?.email ?? 'guest@devpilot.ai';
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2);
+
+  const gitHubUsername = name.toLowerCase().replace(/\s+/g, '');
+
   return (
     <AppShell>
       <PageHeader title="Profile" description="Your account details and activity overview." />
@@ -41,17 +75,17 @@ export default function ProfilePage() {
           <div className="-mt-12 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
               <Avatar className="h-24 w-24 border-4 border-card">
-                <AvatarImage src="https://i.pravatar.cc/200?img=8" alt="Alex Morgan" />
-                <AvatarFallback>AM</AvatarFallback>
+                <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`} alt={name} />
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <div className="pb-1">
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-semibold">Alex Morgan</h2>
+                  <h2 className="text-xl font-semibold">{name}</h2>
                   <Badge className="gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white">
                     <Crown className="h-3 w-3" /> Pro
                   </Badge>
                 </div>
-                <p className="text-sm text-muted-foreground">Senior Software Engineer</p>
+                <p className="text-sm text-muted-foreground">Software Engineer</p>
               </div>
             </div>
             <Button variant="outline" size="sm">
@@ -62,10 +96,10 @@ export default function ProfilePage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Mail className="h-4 w-4" /> alex@devpilot.ai
+              <Mail className="h-4 w-4" /> {email}
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Github className="h-4 w-4" /> github.com/alexmorgan
+            <div className="flex items-center gap-2 text-sm text-muted-foreground truncate">
+              <Github className="h-4 w-4" /> github.com/{gitHubUsername}
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <MapPin className="h-4 w-4" /> San Francisco, CA

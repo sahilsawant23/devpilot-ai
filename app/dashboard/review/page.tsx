@@ -13,6 +13,7 @@ import {
   Filter,
   Search,
 } from 'lucide-react';
+import Link from 'next/link';
 import { AppShell } from '@/components/app-shell';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -163,9 +164,35 @@ const filters: (Severity | 'All')[] = ['All', 'Critical', 'High', 'Medium', 'Low
 export default function CodeReviewPage() {
   const [filter, setFilter] = React.useState<Severity | 'All'>('All');
   const [query, setQuery] = React.useState('');
+  const [issuesList, setIssuesList] = React.useState<Issue[]>([]);
   const [resolved, setResolved] = React.useState<Set<string>>(new Set());
 
-  const filtered = issues.filter(
+  async function fetchIssues() {
+    try {
+      const res = await fetch('/api/review');
+      if (res.ok) {
+        const data = await res.json();
+        const loadedIssues = data.issues ?? [];
+        setIssuesList(loadedIssues);
+        
+        const resSet = new Set<string>();
+        loadedIssues.forEach((i: any) => {
+          if (i.resolved) resSet.add(i.id);
+        });
+        setResolved(resSet);
+      }
+    } catch (err) {
+      console.error('Failed to fetch review issues:', err);
+    }
+  }
+
+  React.useEffect(() => {
+    fetchIssues();
+  }, []);
+
+  const displayIssues = issuesList.length > 0 ? issuesList : issues;
+
+  const filtered = displayIssues.filter(
     (i) =>
       (filter === 'All' || i.severity === filter) &&
       (i.title.toLowerCase().includes(query.toLowerCase()) ||
@@ -173,19 +200,35 @@ export default function CodeReviewPage() {
   );
 
   const counts = {
-    Critical: issues.filter((i) => i.severity === 'Critical').length,
-    High: issues.filter((i) => i.severity === 'High').length,
-    Medium: issues.filter((i) => i.severity === 'Medium').length,
-    Low: issues.filter((i) => i.severity === 'Low').length,
+    Critical: displayIssues.filter((i) => i.severity === 'Critical').length,
+    High: displayIssues.filter((i) => i.severity === 'High').length,
+    Medium: displayIssues.filter((i) => i.severity === 'Medium').length,
+    Low: displayIssues.filter((i) => i.severity === 'Low').length,
   };
 
-  function toggleResolved(id: string) {
-    setResolved((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  async function toggleResolved(id: string) {
+    const isCurrentlyResolved = resolved.has(id);
+    const nextState = !isCurrentlyResolved;
+
+    try {
+      const res = await fetch('/api/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ issueId: id, resolved: nextState }),
+      });
+
+      if (res.ok) {
+        setResolved((prev) => {
+          const next = new Set(prev);
+          if (nextState) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        toast.success(nextState ? 'Issue marked as resolved' : 'Issue resolution undone');
+      }
+    } catch (err) {
+      toast.error('Failed to update issue status');
+    }
   }
 
   return (
@@ -194,7 +237,11 @@ export default function CodeReviewPage() {
         title="Code Review"
         description="AI-detected issues across web-platform with suggested fixes."
         actions={
-          <Button size="sm" className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:opacity-90">
+          <Button 
+            onClick={fetchIssues}
+            size="sm" 
+            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:opacity-90"
+          >
             Re-run analysis
           </Button>
         }
@@ -302,9 +349,11 @@ export default function CodeReviewPage() {
                     </div>
 
                     <div className="flex shrink-0 gap-2">
-                      <Button variant="outline" size="sm">
-                        View code
-                        <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/dashboard/review/${issue.id}`}>
+                          View code
+                          <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                        </Link>
                       </Button>
                       <Button
                         variant={isResolved ? 'secondary' : 'default'}

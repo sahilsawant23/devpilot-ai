@@ -25,6 +25,8 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
+import { formatDistanceToNow } from 'date-fns';
+
 type Role = 'user' | 'assistant';
 type Message = {
   id: string;
@@ -40,15 +42,6 @@ type Conversation = {
   preview: string;
   time: string;
 };
-
-const conversations: Conversation[] = [
-  { id: 'c1', title: 'Explain authentication flow', preview: 'The auth flow uses JWT...', time: '2m ago' },
-  { id: 'c2', title: 'Find bugs in payment gateway', preview: 'I found 3 potential issues...', time: '18m ago' },
-  { id: 'c3', title: 'Generate tests for user-service', preview: 'Here are 42 test cases...', time: '1h ago' },
-  { id: 'c4', title: 'Create README for analytics', preview: '# Analytics Engine...', time: '3h ago' },
-  { id: 'c5', title: 'Improve API performance', preview: 'Consider adding caching...', time: '1d ago' },
-  { id: 'c6', title: 'Explain the state management', preview: 'You are using Redux...', time: '2d ago' },
-];
 
 const suggestedPrompts = [
   { icon: Sparkles, label: 'Explain this repository' },
@@ -151,38 +144,83 @@ export default function ChatPage() {
     {
       id: 'm1',
       role: 'assistant',
-      content: 'Hi Alex! I have indexed **web-platform**. Ask me anything about the codebase, or pick a suggested prompt below to get started.',
+      content: 'Hi there! I have indexed **web-platform**. Ask me anything about the codebase, or pick a suggested prompt below to get started.',
     },
   ]);
   const [input, setInput] = React.useState('');
   const [typing, setTyping] = React.useState(false);
-  const [activeConv, setActiveConv] = React.useState('c1');
+  const [activeConv, setActiveConv] = React.useState('');
   const [copiedId, setCopiedId] = React.useState<string | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
+  // Dynamic chat list states
+  const [conversationsList, setConversationsList] = React.useState<Conversation[]>([]);
+
+  async function fetchConversations() {
+    try {
+      const res = await fetch('/api/chat');
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = (data.chats ?? []).map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          preview: 'Click to resume conversation...',
+          time: formatDistanceToNow(new Date(c.updatedAt), { addSuffix: true }),
+        }));
+        setConversationsList(mapped);
+        
+        // Auto select the first conversation if activeConv is empty
+        if (mapped.length > 0 && !activeConv) {
+          setActiveConv(mapped[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch chat sessions:', err);
+    }
+  }
+
+  React.useEffect(() => {
+    fetchConversations();
+  }, []);
+
   const filteredConversations = React.useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
+    if (!searchQuery.trim()) return conversationsList;
     const q = searchQuery.toLowerCase();
-    return conversations.filter(
+    return conversationsList.filter(
       (c) => c.title.toLowerCase().includes(q) || c.preview.toLowerCase().includes(q)
     );
-  }, [searchQuery]);
+  }, [searchQuery, conversationsList]);
 
   React.useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, typing]);
 
-  function newConversation() {
-    setMessages([
-      {
-        id: `m-${Date.now()}`,
-        role: 'assistant',
-        content: 'New conversation started. Ask me anything about your codebase!',
-      },
-    ]);
-    setActiveConv('');
-    toast.success('New conversation started');
+  async function newConversation() {
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Conversation' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success('New conversation started');
+        fetchConversations();
+        if (data.chat) {
+          setActiveConv(data.chat.id);
+          setMessages([
+            {
+              id: `m-${Date.now()}`,
+              role: 'assistant',
+              content: 'New conversation started. Ask me anything about your codebase!',
+            },
+          ]);
+        }
+      }
+    } catch (err) {
+      toast.error('Failed to start new conversation');
+    }
   }
 
   function clearChat() {
