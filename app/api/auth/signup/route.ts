@@ -41,13 +41,14 @@ export async function POST(req: Request) {
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
+        role: email.toLowerCase().includes('admin') ? 'ADMIN' : 'DEVELOPER',
       },
     });
 
     return NextResponse.json(
       {
         message: 'User created successfully',
-        user: { id: user.id, name: user.name, email: user.email },
+        user: { id: user.id, name: user.name, email: user.email, role: user.role },
       },
       { status: 201 }
     );

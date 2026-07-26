@@ -35,8 +35,9 @@ export async function POST(req: Request) {
     }
 
     // Set cookie
+    const userRole = user.role || (user.email.includes('admin') ? 'ADMIN' : 'DEVELOPER');
     const cookieStore = cookies();
-    cookieStore.set('devpilot_user', JSON.stringify({ id: user.id, name: user.name, email: user.email }), {
+    cookieStore.set('devpilot_user', JSON.stringify({ id: user.id, name: user.name, email: user.email, role: userRole }), {
       path: '/',
       maxAge: 60 * 60 * 24 * 30, // 30 days
       sameSite: 'lax',
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       message: 'Login successful',
-      user: { id: user.id, name: user.name, email: user.email },
+      user: { id: user.id, name: user.name, email: user.email, role: userRole },
     });
   } catch (error) {
     console.error('Login error:', error);
