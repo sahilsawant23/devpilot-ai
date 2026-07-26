@@ -143,20 +143,28 @@ export default function DocsPage() {
   const [copied, setCopied] = React.useState(false);
   const [content, setContent] = React.useState(sampleDocs.readme);
 
-  function generate(type: string) {
+  async function generate(type: string) {
     setActive(type);
     setGenerating(true);
     setContent('');
-    let i = 0;
-    const full = sampleDocs[type];
-    const interval = setInterval(() => {
-      i += 24;
-      setContent(full.slice(0, i));
-      if (i >= full.length) {
-        clearInterval(interval);
-        setGenerating(false);
+
+    try {
+      const res = await fetch('/api/docs/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ docType: type, repoName: 'web-platform' }),
+      });
+      const data = await res.json();
+      if (data.content) {
+        setContent(data.content);
+      } else {
+        setContent(sampleDocs[type] || 'No content generated.');
       }
-    }, 18);
+    } catch {
+      setContent(sampleDocs[type] || 'Fallback content.');
+    } finally {
+      setGenerating(false);
+    }
   }
 
   React.useEffect(() => {
