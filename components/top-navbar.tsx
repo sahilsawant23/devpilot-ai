@@ -19,14 +19,57 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { navItems } from '@/lib/nav';
 import { repositories } from '@/lib/data';
 import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
 export function TopNavbar({ onMenu }: { onMenu: () => void }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [user, setUser] = React.useState<{ name: string; email: string; role?: string } | null>(null);
+  const [notificationsList, setNotificationsList] = React.useState<any[]>([]);
+
+  async function fetchNotifications() {
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) {
+        const data = await res.json();
+        setNotificationsList(data.notifications ?? []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  }
+
+  React.useEffect(() => {
+    async function fetchMe() {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.user) {
+            setUser(data.user);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch user in navbar:', err);
+      }
+    }
+    fetchMe();
+    fetchNotifications();
+  }, []);
+
+  const name = user?.name ?? 'Sahil Sawant';
+  const email = user?.email ?? 'sahil@devpilot.ai';
+  const role = user?.role ?? 'ADMIN';
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2);
+
   const [query, setQuery] = React.useState('');
   const [showSearch, setShowSearch] = React.useState(false);
   const [mobileSearch, setMobileSearch] = React.useState(false);
-  const [readNotifications, setReadNotifications] = React.useState<Set<number>>(new Set());
 
   const results = React.useMemo(() => {
     if (!query.trim()) return [];
@@ -36,13 +79,7 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
       .slice(0, 5);
   }, [query]);
 
-  const notifications = [
-    { id: 1, title: 'Repository analysis complete', time: '2m', unread: true },
-    { id: 2, title: '3 new bugs detected in billing-api', time: '18m', unread: true },
-    { id: 3, title: 'Documentation generated', time: '1h', unread: false },
-  ];
-
-  const unreadCount = notifications.filter((n) => !readNotifications.has(n.id) && n.unread).length;
+  const unreadCount = notificationsList.filter((n) => !n.read).length;
 
   const current =
     [...navItems]
@@ -179,7 +216,18 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
               <span>Notifications</span>
               {unreadCount > 0 && (
                 <button
-                  onClick={() => setReadNotifications(new Set(notifications.map((n) => n.id)))}
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/notifications', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ all: true })
+                      });
+                      if (res.ok) fetchNotifications();
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
                   className="text-xs font-normal text-primary hover:underline"
                 >
                   Mark all read
@@ -187,22 +235,40 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
               )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {notifications.map((n) => {
-              const isUnread = !readNotifications.has(n.id) && n.unread;
-              return (
-                <DropdownMenuItem
-                  key={n.id}
-                  className="flex items-start justify-between gap-2 py-2"
-                  onClick={() => setReadNotifications((prev) => new Set(prev).add(n.id))}
-                >
-                  <div>
-                    <p className="text-sm font-medium">{n.title}</p>
-                    <p className="text-xs text-muted-foreground">{n.time} ago</p>
-                  </div>
-                  {isUnread && <span className="mt-1 h-2 w-2 rounded-full bg-primary" />}
-                </DropdownMenuItem>
-              );
-            })}
+            {notificationsList.length === 0 ? (
+              <p className="p-4 text-center text-xs text-muted-foreground">No notifications</p>
+            ) : (
+              notificationsList.map((n) => {
+                const isUnread = !n.read;
+                return (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="flex items-start justify-between gap-2 py-2"
+                    onClick={async () => {
+                      if (n.read) return;
+                      try {
+                        const res = await fetch('/api/notifications', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: n.id })
+                        });
+                        if (res.ok) fetchNotifications();
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{n.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                      </p>
+                    </div>
+                    {isUnread && <span className="mt-1 h-2 w-2 rounded-full bg-primary" />}
+                  </DropdownMenuItem>
+                );
+              })
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -212,19 +278,24 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
           <DropdownMenuTrigger asChild>
             <button className="ml-1 flex items-center gap-2 rounded-lg p-1 pr-2 hover:bg-accent">
               <Avatar className="h-7 w-7">
-                <AvatarImage src="https://i.pravatar.cc/100?img=8" alt="Alex Morgan" />
-                <AvatarFallback>AM</AvatarFallback>
+                <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`} alt={name} />
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
-              <span className="hidden text-sm font-medium sm:inline">Alex Morgan</span>
+              <span className="hidden text-sm font-medium sm:inline">{name}</span>
               <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:inline" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
+          <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
-              <div>
-                <p className="text-sm font-medium">Alex Morgan</p>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">{name}</p>
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary border border-primary/20">
+                    {role}
+                  </span>
+                </div>
                 <p className="text-xs font-normal text-muted-foreground">
-                  alex@devpilot.ai
+                  {email}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -236,7 +307,10 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push('/login')}>
+            <DropdownMenuItem onClick={async () => {
+              await fetch('/api/auth/me', { method: 'DELETE' });
+              router.push('/login');
+            }}>
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
