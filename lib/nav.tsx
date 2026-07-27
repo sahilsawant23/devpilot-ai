@@ -12,6 +12,7 @@ import {
   Network,
   Bot,
   Crown,
+  Zap,
 } from 'lucide-react';
 
 export type NavItem = {
@@ -29,6 +30,7 @@ export const navItems: NavItem[] = [
   { title: 'Documentation', href: '/dashboard/docs', icon: FileText },
   { title: 'Unit Tests', href: '/dashboard/tests', icon: TestTube },
   { title: 'AI Agents', href: '/dashboard/agents', icon: Bot },
+  { title: 'Performance', href: '/dashboard/performance', icon: Zap },
   { title: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
   { title: 'Analytics', href: '/dashboard/analytics', icon: Activity },
 ];
