@@ -18,6 +18,13 @@ import {
   Eye,
   EyeOff,
   Loader2,
+  Users,
+  Webhook,
+  ShieldCheck,
+  Plus,
+  Send,
+  Download,
+  Sparkles,
 } from 'lucide-react';
 import { AppShell } from '@/components/app-shell';
 import { PageHeader } from '@/components/page-header';
@@ -25,7 +32,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -39,9 +45,19 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { exportToCSV } from '@/lib/export-utils';
 
 function Row({
   title,
@@ -63,6 +79,22 @@ function Row({
   );
 }
 
+interface WebhookItem {
+  id: string;
+  url: string;
+  events: string[];
+  secret: string;
+  active: boolean;
+  createdAt: string;
+}
+
+const mockAuditLogs = [
+  { id: '1', event: 'User Login', user: 'sahil@devpilot.ai', ip: '192.168.1.45', location: 'Mumbai, IN', date: '2026-07-27 22:15', status: 'SUCCESS' },
+  { id: '2', event: 'API Key Created', user: 'sahil@devpilot.ai', ip: '192.168.1.45', location: 'Mumbai, IN', date: '2026-07-27 21:04', status: 'SUCCESS' },
+  { id: '3', event: 'Role Promotion', user: 'admin@devpilot.ai', ip: '10.0.0.12', location: 'San Francisco, US', date: '2026-07-26 18:40', status: 'SUCCESS' },
+  { id: '4', event: 'Failed Auth Attempt', user: 'unknown@hacker.io', ip: '185.220.101.5', location: 'Frankfurt, DE', date: '2026-07-25 04:12', status: 'WARN' },
+];
+
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const [notifications, setNotifications] = React.useState({
@@ -71,27 +103,51 @@ export default function SettingsPage() {
     weekly: true,
     security: true,
   });
-  const [connecting, setConnecting] = React.useState(false);
+
+  // Workspace Settings
+  const [workspaceName, setWorkspaceName] = React.useState('DevPilot Production');
+  const [aiModel, setAiModel] = React.useState('gemini-1.5-pro');
+  const [autoScan, setAutoScan] = React.useState(true);
+
+  // Webhooks
+  const [webhooksList, setWebhooksList] = React.useState<WebhookItem[]>([]);
+  const [webhookDialogOpen, setWebhookDialogOpen] = React.useState(false);
+  const [newWebhookUrl, setNewWebhookUrl] = React.useState('');
+  const [selectedEvents, setSelectedEvents] = React.useState<string[]>(['vulnerability.detected']);
+  const [testingWebhookId, setTestingWebhookId] = React.useState<string | null>(null);
+
+  // API Keys
   const [apiKeysList, setApiKeysList] = React.useState<Array<{ id: string; name: string; key: string; createdAt?: string }>>([]);
   const [visibleKeyIds, setVisibleKeyIds] = React.useState<Record<string, boolean>>({});
+
+  const fetchWebhooks = React.useCallback(async () => {
+    try {
+      const res = await fetch('/api/webhooks');
+      if (res.ok) {
+        const data = await res.json();
+        setWebhooksList(data.webhooks ?? []);
+      }
+    } catch {
+      // Keep silent
+    }
+  }, []);
 
   const fetchApiKeys = React.useCallback(async () => {
     try {
       const res = await fetch('/api/apikeys');
       if (res.ok) {
         const data = await res.json();
-        if (data.keys) {
-          setApiKeysList(data.keys);
-        }
+        if (data.keys) setApiKeysList(data.keys);
       }
     } catch {
-      // Keep silent or default
+      // Keep silent
     }
   }, []);
 
   React.useEffect(() => {
     fetchApiKeys();
-  }, [fetchApiKeys]);
+    fetchWebhooks();
+  }, [fetchApiKeys, fetchWebhooks]);
 
   const toggleKeyVisibility = (id: string) => {
     setVisibleKeyIds((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -111,6 +167,62 @@ export default function SettingsPage() {
     }
   };
 
+  const handleCreateWebhook = async () => {
+    if (!newWebhookUrl.trim()) {
+      toast.error('Please enter a valid HTTP/HTTPS Webhook URL');
+      return;
+    }
+    try {
+      const res = await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newWebhookUrl, events: selectedEvents }),
+      });
+      if (res.ok) {
+        toast.success('Webhook registered successfully!');
+        setWebhookDialogOpen(false);
+        setNewWebhookUrl('');
+        fetchWebhooks();
+      } else {
+        toast.error('Failed to add webhook');
+      }
+    } catch {
+      toast.error('Network error adding webhook');
+    }
+  };
+
+  const handleTestWebhook = async (id: string) => {
+    setTestingWebhookId(id);
+    try {
+      const res = await fetch('/api/webhooks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'ping', id }),
+      });
+      if (res.ok) {
+        toast.success('Webhook ping payload delivered (200 OK)');
+      } else {
+        toast.error('Webhook ping failed');
+      }
+    } catch {
+      toast.error('Network error testing webhook');
+    } finally {
+      setTestingWebhookId(null);
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    try {
+      const res = await fetch(`/api/webhooks?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        toast.success('Webhook deleted');
+        fetchWebhooks();
+      }
+    } catch {
+      toast.error('Failed to delete webhook');
+    }
+  };
+
   const themes = [
     { id: 'light', label: 'Light', icon: Sun },
     { id: 'dark', label: 'Dark', icon: Moon },
@@ -119,28 +231,186 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <PageHeader title="Settings" description="Manage your account, preferences, and integrations." />
+      <PageHeader title="Settings & Workspace Preferences" description="Manage your team workspace, theme, webhooks, API tokens, and security policies." />
 
-      <Tabs defaultValue="appearance" className="grid gap-6 lg:grid-cols-[200px_1fr]">
+      <Tabs defaultValue="workspace" className="grid gap-6 lg:grid-cols-[220px_1fr]">
         <TabsList className="flex h-auto flex-col items-stretch gap-1 bg-transparent p-0">
+          <TabsTrigger value="workspace" className="justify-start data-[state=active]:bg-primary/10">
+            <Users className="mr-2 h-4 w-4" /> Workspace & AI
+          </TabsTrigger>
+          <TabsTrigger value="webhooks" className="justify-start data-[state=active]:bg-primary/10">
+            <Webhook className="mr-2 h-4 w-4" /> Webhooks
+          </TabsTrigger>
           <TabsTrigger value="appearance" className="justify-start data-[state=active]:bg-primary/10">
             <Palette className="mr-2 h-4 w-4" /> Appearance
           </TabsTrigger>
           <TabsTrigger value="notifications" className="justify-start data-[state=active]:bg-primary/10">
             <Bell className="mr-2 h-4 w-4" /> Notifications
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="justify-start data-[state=active]:bg-primary/10">
-            <Github className="mr-2 h-4 w-4" /> Integrations
-          </TabsTrigger>
           <TabsTrigger value="api" className="justify-start data-[state=active]:bg-primary/10">
-            <Key className="mr-2 h-4 w-4" /> API
+            <Key className="mr-2 h-4 w-4" /> API Keys
           </TabsTrigger>
           <TabsTrigger value="security" className="justify-start data-[state=active]:bg-primary/10">
-            <Shield className="mr-2 h-4 w-4" /> Security
+            <ShieldCheck className="mr-2 h-4 w-4" /> Security Audit
           </TabsTrigger>
         </TabsList>
 
         <div>
+          {/* Workspace & AI */}
+          <TabsContent value="workspace" className="mt-0 space-y-4">
+            <Card className="border-border/60 bg-card/50">
+              <CardHeader>
+                <CardTitle className="text-base">Team Workspace</CardTitle>
+                <CardDescription>Configure workspace settings and AI model defaults</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Row title="Workspace Name" description="Identify your organization or team">
+                  <Input
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    className="sm:w-64"
+                  />
+                </Row>
+
+                <Row title="Default AI Engine" description="Primary LLM used for code review & agents">
+                  <Select value={aiModel} onValueChange={setAiModel}>
+                    <SelectTrigger className="sm:w-64">
+                      <Sparkles className="mr-2 h-4 w-4 text-purple-500" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro (Recommended)</SelectItem>
+                      <SelectItem value="gpt-4o">GPT-4o (High Accuracy)</SelectItem>
+                      <SelectItem value="claude-3-5">Claude 3.5 Sonnet</SelectItem>
+                      <SelectItem value="local-llm">DevPilot Self-Hosted LLM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Row>
+
+                <Row title="Automated PR Security Scanning" description="Scan every pull request automatically before merge">
+                  <Switch checked={autoScan} onCheckedChange={setAutoScan} />
+                </Row>
+
+                <div className="flex justify-end pt-2">
+                  <Button size="sm" onClick={() => toast.success('Workspace preferences saved')}>
+                    Save Preferences
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Webhooks */}
+          <TabsContent value="webhooks" className="mt-0 space-y-4">
+            <Card className="border-border/60 bg-card/50">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Webhook Endpoints</CardTitle>
+                  <CardDescription>Receive real-time HTTP callbacks for security alerts and agent completions.</CardDescription>
+                </div>
+                <Dialog open={webhookDialogOpen} onOpenChange={setWebhookDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="bg-primary text-primary-foreground">
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Webhook
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Register New Webhook</DialogTitle>
+                      <DialogDescription>
+                        DevPilot will send POST payloads with HMAC signatures for selected events.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase">Payload URL</label>
+                        <Input
+                          placeholder="https://api.yourdomain.com/devpilot-webhook"
+                          value={newWebhookUrl}
+                          onChange={(e) => setNewWebhookUrl(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-muted-foreground uppercase">Event Subscriptions</label>
+                        <div className="space-y-2 text-xs">
+                          {['vulnerability.detected', 'agent.completed', 'docs.generated', 'report.ready'].map((evt) => (
+                            <label key={evt} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedEvents.includes(evt)}
+                                onChange={(e) => {
+                                  if (e.target.checked) setSelectedEvents([...selectedEvents, evt]);
+                                  else setSelectedEvents(selectedEvents.filter((item) => item !== evt));
+                                }}
+                                className="rounded border-border text-primary"
+                              />
+                              <code>{evt}</code>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setWebhookDialogOpen(false)}>Cancel</Button>
+                      <Button onClick={handleCreateWebhook}>Save Webhook</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {webhooksList.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    No webhooks configured. Click &quot;Add Webhook&quot; above to connect external services like Slack or GitHub.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {webhooksList.map((wh) => (
+                      <div key={wh.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                            <p className="font-mono text-xs font-semibold truncate">{wh.url}</p>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            {wh.events.map((e) => (
+                              <span key={e} className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                                {e}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleTestWebhook(wh.id)}
+                            disabled={testingWebhookId === wh.id}
+                          >
+                            {testingWebhookId === wh.id ? (
+                              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Send className="mr-1 h-3.5 w-3.5" />
+                            )}
+                            Test Ping
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteWebhook(wh.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Appearance */}
           <TabsContent value="appearance" className="mt-0 space-y-4">
             <Card className="border-border/60 bg-card/50">
@@ -165,30 +435,6 @@ export default function SettingsPage() {
                     </button>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60 bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-base">Language</CardTitle>
-                <CardDescription>Interface language preference</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Row title="Display language" description="Used for the UI text and notifications">
-                  <Select defaultValue="en">
-                    <SelectTrigger className="w-40">
-                      <Globe className="mr-2 h-4 w-4" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="es">Español</SelectItem>
-                      <SelectItem value="fr">Français</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
-                      <SelectItem value="ja">日本語</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Row>
               </CardContent>
             </Card>
           </TabsContent>
@@ -229,62 +475,8 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          {/* Integrations */}
-          <TabsContent value="integrations" className="mt-0">
-            <Card className="border-border/60 bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-base">Connected accounts</CardTitle>
-                <CardDescription>Manage your third-party integrations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between rounded-xl border border-border/60 bg-background/40 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-foreground/10">
-                      <Github className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">GitHub</p>
-                      <p className="text-xs text-emerald-500">Connected as alexmorgan</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">Manage</Button>
-                    <Button variant="ghost" size="sm" className="text-destructive">Disconnect</Button>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-background/40 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-foreground/10">
-                      <Github className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">GitLab</p>
-                      <p className="text-xs text-muted-foreground">Not connected</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setConnecting(true);
-                      setTimeout(() => {
-                        setConnecting(false);
-                        toast.success('GitLab connected');
-                      }, 1200);
-                    }}
-                    disabled={connecting}
-                  >
-                    {connecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Connect
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* API */}
-          <TabsContent value="api" className="mt-0">
+          {/* API Keys */}
+          <TabsContent value="api" className="mt-0 space-y-4">
             <Card className="border-border/60 bg-card/50">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -308,7 +500,7 @@ export default function SettingsPage() {
                       } else {
                         toast.error(data.error || 'Failed to create key');
                       }
-                    } catch (e) {
+                    } catch {
                       toast.error('Network error creating API key');
                     }
                   }}
@@ -356,7 +548,7 @@ export default function SettingsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            className="text-destructive hover:bg-destructive/10"
                             onClick={() => revokeKey(k.id)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -366,34 +558,66 @@ export default function SettingsPage() {
                     ))
                   )}
                 </div>
-
-                <Row title="Rate limit" description="Requests per minute on your plan">
-                  <span className="text-sm font-medium">600 / min</span>
-                </Row>
-                <Row title="Webhook URL" description="Receive event callbacks for build & review triggers">
-                  <Input placeholder="https://your-app.com/webhook" className="sm:w-72" />
-                </Row>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Security + Danger */}
+          {/* Security Audit Log */}
           <TabsContent value="security" className="mt-0 space-y-4">
             <Card className="border-border/60 bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-base">Security</CardTitle>
-                <CardDescription>Keep your account secure</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-base">Security Audit Log</CardTitle>
+                  <CardDescription>View authentication attempts, privilege modifications, and system events.</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    exportToCSV('security_audit_logs', mockAuditLogs);
+                    toast.success('Exported security log CSV');
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" /> Export CSV
+                </Button>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <Row title="Change password" description="Update your account password">
-                  <Button variant="outline" size="sm">Change</Button>
-                </Row>
-                <Row title="Two-factor authentication" description="Add an extra layer of security">
-                  <Button variant="outline" size="sm">Enable 2FA</Button>
-                </Row>
-                <Row title="Active sessions" description="2 active devices">
-                  <Button variant="outline" size="sm">View sessions</Button>
-                </Row>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-muted-foreground font-semibold uppercase">
+                        <th className="py-3 px-2">Event</th>
+                        <th className="py-3 px-2">User</th>
+                        <th className="py-3 px-2">IP Address</th>
+                        <th className="py-3 px-2">Location</th>
+                        <th className="py-3 px-2">Timestamp</th>
+                        <th className="py-3 px-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {mockAuditLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-accent/40">
+                          <td className="py-3 px-2 font-medium">{log.event}</td>
+                          <td className="py-3 px-2 text-muted-foreground">{log.user}</td>
+                          <td className="py-3 px-2 font-mono">{log.ip}</td>
+                          <td className="py-3 px-2 text-muted-foreground">{log.location}</td>
+                          <td className="py-3 px-2 text-muted-foreground">{log.date}</td>
+                          <td className="py-3 px-2">
+                            <span
+                              className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                log.status === 'SUCCESS'
+                                  ? 'bg-emerald-500/15 text-emerald-500'
+                                  : 'bg-amber-500/15 text-amber-500'
+                              }`}
+                            >
+                              {log.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
 
