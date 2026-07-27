@@ -207,68 +207,136 @@ export function TopNavbar({ onMenu }: { onMenu: () => void }) {
             <Button variant="ghost" size="icon" className="relative h-9 w-9" aria-label="Notifications">
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-primary" />
+                <span className="absolute right-1.5 top-1.5 flex h-2 w-2 rounded-full bg-primary animate-pulse" />
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-72">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              {unreadCount > 0 && (
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/notifications', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ all: true })
-                      });
-                      if (res.ok) fetchNotifications();
-                    } catch (err) {
-                      console.error(err);
-                    }
-                  }}
-                  className="text-xs font-normal text-primary hover:underline"
-                >
-                  Mark all read
-                </button>
-              )}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {notificationsList.length === 0 ? (
-              <p className="p-4 text-center text-xs text-muted-foreground">No notifications</p>
-            ) : (
-              notificationsList.map((n) => {
-                const isUnread = !n.read;
-                return (
-                  <DropdownMenuItem
-                    key={n.id}
-                    className="flex items-start justify-between gap-2 py-2"
+          <DropdownMenuContent align="end" className="w-80 p-0 sm:w-96">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-sm">Notifications</span>
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    {unreadCount} new
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                {unreadCount > 0 && (
+                  <button
                     onClick={async () => {
-                      if (n.read) return;
                       try {
                         const res = await fetch('/api/notifications', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ id: n.id })
+                          body: JSON.stringify({ all: true })
                         });
-                        if (res.ok) fetchNotifications();
+                        if (res.ok) {
+                          toast.success('Marked all as read');
+                          fetchNotifications();
+                        }
                       } catch (err) {
                         console.error(err);
                       }
                     }}
+                    className="text-primary hover:underline font-medium"
                   >
-                    <div>
-                      <p className="text-sm font-medium">{n.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
-                      </p>
+                    Mark all read
+                  </button>
+                )}
+                {notificationsList.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/notifications?all=true', {
+                          method: 'DELETE'
+                        });
+                        if (res.ok) {
+                          toast.info('Notifications cleared');
+                          fetchNotifications();
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      }
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+            <DropdownMenuSeparator className="m-0" />
+            <div className="max-h-80 overflow-y-auto divide-y divide-border">
+              {notificationsList.length === 0 ? (
+                <div className="p-8 text-center">
+                  <Bell className="mx-auto h-8 w-8 text-muted-foreground/40 mb-2" />
+                  <p className="text-sm font-medium">All caught up!</p>
+                  <p className="text-xs text-muted-foreground mt-1">No pending notifications at this moment.</p>
+                </div>
+              ) : (
+                notificationsList.map((n) => {
+                  const isUnread = !n.read;
+                  return (
+                    <div
+                      key={n.id}
+                      className={`group relative flex items-start gap-3 p-3 text-left transition-colors hover:bg-accent/50 ${
+                        isUnread ? 'bg-primary/5' : ''
+                      }`}
+                    >
+                      <div className="mt-1 flex h-2 w-2 shrink-0 rounded-full">
+                        {isUnread ? (
+                          <span className="h-2 w-2 rounded-full bg-primary" />
+                        ) : (
+                          <span className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+                        )}
+                      </div>
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={async () => {
+                          if (!n.read) {
+                            try {
+                              const res = await fetch('/api/notifications', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: n.id })
+                              });
+                              if (res.ok) fetchNotifications();
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }
+                        }}
+                      >
+                        <p className={`text-xs sm:text-sm ${isUnread ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                          {n.title}
+                        </p>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                          {formatDistanceToNow(new Date(n.createdAt), { addSuffix: true })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            const res = await fetch(`/api/notifications?id=${n.id}`, {
+                              method: 'DELETE'
+                            });
+                            if (res.ok) fetchNotifications();
+                          } catch (err) {
+                            console.error(err);
+                          }
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-foreground transition-opacity"
+                        title="Delete notification"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
                     </div>
-                    {isUnread && <span className="mt-1 h-2 w-2 rounded-full bg-primary" />}
-                  </DropdownMenuItem>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
 
